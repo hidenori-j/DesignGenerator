@@ -37,3 +37,25 @@ ingestRoutes.post("/ingest/batch", async (c) => {
 		return c.json({ error: "Ingest service unavailable" }, 503);
 	}
 });
+
+ingestRoutes.get("/collection/stats", async (c) => {
+	try {
+		const res = await fetch(`${INGEST_SERVICE_URL}/api/v1/collection/stats`);
+		const data = await res.json().catch(() => ({}));
+		return c.json(data, res.status as 200);
+	} catch {
+		return c.json({ error: "Ingest service unavailable" }, 503);
+	}
+});
+
+ingestRoutes.delete("/collection/reset", async (c) => {
+	try {
+		const res = await fetch(`${INGEST_SERVICE_URL}/api/v1/collection/reset`, {
+			method: "DELETE",
+		});
+		const data = await res.json().catch(() => ({}));
+		return c.json(data, res.status as 200);
+	} catch {
+		return c.json({ error: "Ingest service unavailable" }, 503);
+	}
+});

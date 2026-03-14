@@ -112,3 +112,137 @@ async def get_job_images(job_id: str) -> dict:
         "total": len(job.images),
         "images": [img.model_dump() for img in job.images],
     }
+
+
+# ---------------------------------------------------------------------------
+# Local file management: list & bulk ingest
+# ---------------------------------------------------------------------------
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+@app.get("/api/v1/local/files")
+async def list_local_files(source: str | None = None) -> dict:
+    """List downloaded image files on disk, optionally filtered by source."""
+    base = settings.download_dir
+    if not base.exists():
+        return {"total": 0, "sources": {}, "files": []}
+
+    if source:
+        dirs = [base / source] if (base / source).is_dir() else []
+    else:
+        dirs = [d for d in sorted(base.iterdir()) if d.is_dir()]
+
+    files: list[dict] = []
+    sources_summary: dict[str, int] = {}
+    for d in dirs:
+        count = 0
+        for f in sorted(d.iterdir()):
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS:
+                files.append({
+                    "filename": f.name,
+                    "source": d.name,
+                    "size": f.stat().st_size,
+                    "path": str(f),
+                })
+                count += 1
+        if count > 0:
+            sources_summary[d.name] = count
+
+    return {"total": len(files), "sources": sources_summary, "files": files}
+
+
+class BulkIngestRequest(BaseModel):
+    source: str | None = None
+    category: str = "unknown"
+    dedup: str = "skip"
+
+
+_bulk_jobs: dict[str, dict] = {}
+
+
+@app.post("/api/v1/local/ingest")
+async def bulk_ingest_local(req: BulkIngestRequest) -> dict:
+    """Start a bulk ingest job for locally downloaded files."""
+    base = settings.download_dir
+    if not base.exists():
+        raise HTTPException(400, f"Download directory does not exist: {base}")
+
+    if req.source:
+        dirs = [base / req.source] if (base / req.source).is_dir() else []
+    else:
+        dirs = [d for d in base.iterdir() if d.is_dir()]
+
+    file_paths = []
+    for d in dirs:
+        for f in sorted(d.iterdir()):
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS:
+                file_paths.append((f, d.name))
+
+    if not file_paths:
+        raise HTTPException(400, "No image files found in the specified directory")
+
+    job_id = str(uuid.uuid4())
+    job_state = {
+        "job_id": job_id,
+        "status": "running",
+        "total": len(file_paths),
+        "ingested": 0,
+        "skipped": 0,
+        "failed": 0,
+        "progress": 0,
+        "category": req.category,
+        "dedup": req.dedup,
+        "source": req.source or "all",
+        "errors": [],
+        "created_at": datetime.now(UTC).isoformat(),
+        "finished_at": None,
+    }
+    _bulk_jobs[job_id] = job_state
+    asyncio.create_task(_run_bulk_ingest(job_state, file_paths, req.category, req.dedup))
+    return {"job_id": job_id, "status": "running", "total": len(file_paths)}
+
+
+@app.get("/api/v1/local/ingest/{job_id}")
+async def get_bulk_ingest_status(job_id: str) -> dict:
+    """Get status of a bulk ingest job."""
+    job = _bulk_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Bulk ingest job not found")
+    return job
+
+
+async def _run_bulk_ingest(
+    job: dict,
+    file_paths: list[tuple],
+    category: str,
+    dedup: str,
+) -> None:
+    for i, (filepath, source_name) in enumerate(file_paths):
+        try:
+            await push_to_ingest(
+                filepath,
+                category=category,
+                license_type="copyrighted_reference",
+                source_url="",
+                source_domain=source_name,
+                dedup=dedup,
+            )
+            job["ingested"] += 1
+        except Exception as e:
+            err_msg = str(e)
+            if "Duplicate skipped" in err_msg or "skipped" in err_msg.lower():
+                job["skipped"] += 1
+            else:
+                job["failed"] += 1
+                if len(job["errors"]) < 20:
+                    job["errors"].append({"file": filepath.name, "error": err_msg})
+                logger.warning("Bulk ingest failed for %s: %s", filepath.name, e)
+        job["progress"] = int((i + 1) / job["total"] * 100)
+
+    job["status"] = "completed"
+    job["finished_at"] = datetime.now(UTC).isoformat()
+    logger.info(
+        "Bulk ingest completed: %d ingested, %d skipped, %d failed",
+        job["ingested"], job["skipped"], job["failed"],
+    )

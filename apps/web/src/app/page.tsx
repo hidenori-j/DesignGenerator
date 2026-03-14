@@ -35,6 +35,12 @@ export default function Home() {
           >
             デザイン収集
           </a>
+          <a
+            href="/settings"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium py-3 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+          >
+            設定
+          </a>
         </div>
       </main>
     </div>

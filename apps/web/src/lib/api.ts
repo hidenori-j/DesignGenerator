@@ -202,3 +202,88 @@ export async function getCollectorJobImages(
 	if (!res.ok) throw new Error(`Failed to get images: ${res.status}`);
 	return res.json();
 }
+
+// --- Collection Management ---
+
+export interface CollectionStats {
+	collection: string;
+	points_count: number;
+	vectors_count: number;
+	status: string;
+	error?: string;
+}
+
+export async function getCollectionStats(): Promise<CollectionStats> {
+	const res = await fetch(`${API_BASE}/api/v1/collection/stats`);
+	if (!res.ok) throw new Error(`Failed to get collection stats: ${res.status}`);
+	return res.json();
+}
+
+export async function resetCollection(): Promise<{ status: string; message: string }> {
+	const res = await fetch(`${API_BASE}/api/v1/collection/reset`, {
+		method: "DELETE",
+	});
+	if (!res.ok) throw new Error(`Failed to reset collection: ${res.status}`);
+	return res.json();
+}
+
+// --- Local Files & Bulk Ingest ---
+
+export interface LocalFilesResponse {
+	total: number;
+	sources: Record<string, number>;
+	files: { filename: string; source: string; size: number; path: string }[];
+}
+
+export async function getLocalFiles(source?: string): Promise<LocalFilesResponse> {
+	const qs = source ? `?source=${encodeURIComponent(source)}` : "";
+	const res = await fetch(`${API_BASE}/api/v1/collector/local/files${qs}`);
+	if (!res.ok) throw new Error(`Failed to list local files: ${res.status}`);
+	return res.json();
+}
+
+export interface BulkIngestResponse {
+	job_id: string;
+	status: string;
+	total: number;
+}
+
+export async function bulkIngestLocalFiles(params: {
+	source?: string;
+	category?: string;
+	dedup?: string;
+}): Promise<BulkIngestResponse> {
+	const res = await fetch(`${API_BASE}/api/v1/collector/local/ingest`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			source: params.source || null,
+			category: params.category || "unknown",
+			dedup: params.dedup || "skip",
+		}),
+	});
+	if (!res.ok) throw new Error(`Bulk ingest failed: ${res.status}`);
+	return res.json();
+}
+
+export interface BulkIngestStatus {
+	job_id: string;
+	status: string;
+	total: number;
+	ingested: number;
+	skipped: number;
+	failed: number;
+	progress: number;
+	category: string;
+	dedup: string;
+	source: string;
+	errors: { file: string; error: string }[];
+	created_at: string;
+	finished_at: string | null;
+}
+
+export async function getBulkIngestStatus(jobId: string): Promise<BulkIngestStatus> {
+	const res = await fetch(`${API_BASE}/api/v1/collector/local/ingest/${jobId}`);
+	if (!res.ok) throw new Error(`Failed to get bulk ingest status: ${res.status}`);
+	return res.json();
+}
