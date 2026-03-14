@@ -1,0 +1,50 @@
+[project]
+name = "design-generator-agent"
+version = "0.1.0"
+description = "Agentic RAG Orchestrator for design generation"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "openai>=1.60",
+    "langchain>=0.3",
+    "langchain-openai>=0.3",
+    "langgraph>=0.3",
+    "python-multipart>=0.0.18",
+    "qdrant-client>=1.13,<1.15",
+    "redis>=5.2",
+    "redisvl>=0.4",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "httpx>=0.28",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "python-dotenv>=1.0",
+    "websockets>=14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6",
+    "ruff>=0.9",
+    "pyright>=1.1",
+    "httpx>=0.28",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "ANN", "B", "A", "SIM"]
+ignore = []
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

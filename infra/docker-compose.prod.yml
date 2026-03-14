@@ -1,0 +1,76 @@
+services:
+  # Production overrides - extends base docker-compose.yml
+
+  agent:
+    build:
+      context: ../services/agent
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    depends_on:
+      - qdrant
+      - redis
+      - postgres
+
+  ingest:
+    build:
+      context: ../services/ingest
+      dockerfile: Dockerfile
+    ports:
+      - "8200:8200"
+    env_file:
+      - ../.env
+    depends_on:
+      - qdrant
+      - postgres
+      - minio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  generation:
+    build:
+      context: ../services/generation
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+      - minio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  gpu-arbiter:
+    build:
+      context: ../services/gpu_arbiter
+      dockerfile: Dockerfile
+    ports:
+      - "8300:8300"
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+
+  api-gateway:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    env_file:
+      - ../.env
+    depends_on:
+      - agent

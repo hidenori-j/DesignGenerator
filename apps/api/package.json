@@ -1,0 +1,27 @@
+{
+  "name": "@design-generator/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "lint": "biome check src/",
+    "format": "biome check --write src/",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "hono": "^4",
+    "hono-rate-limiter": "^0.4",
+    "@hono/zod-validator": "^0.4",
+    "zod": "^3",
+    "jose": "^6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1",
+    "@types/bun": "^1",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}
